@@ -194,7 +194,7 @@ async function renderDashboard() {
 
   const { data: forms, error } = await sb
     .from("forms")
-    .select("id, title, is_published, created_at, responses(count)")
+    .select("id, title, is_published, form_type, recipient_name, created_at, responses(count)")
     .eq("user_id", currentUser.id)
     .order("created_at", { ascending: false });
 
@@ -207,14 +207,19 @@ async function renderDashboard() {
   const cards = (forms || [])
     .map((f) => {
       const count = f.responses?.[0]?.count ?? 0;
+      const isIndividual = f.form_type === "individual";
+      const closed = isIndividual && count > 0;
+      const statusLabel = closed ? "Completed" : f.is_published ? "Live" : "Draft";
+      const statusClass = closed ? "done" : f.is_published ? "live" : "draft";
       return `
       <div class="form-card" data-id="${f.id}">
         <div class="meta">
-          <span class="status-pill ${f.is_published ? "live" : "draft"}">${f.is_published ? "Live" : "Draft"}</span>
-          <span>${fmtDate(f.created_at)}</span>
+          <span class="type-pill ${isIndividual ? "individual" : "general"}">${isIndividual ? "Individual" : "General"}</span>
+          <span class="status-pill ${statusClass}">${statusLabel}</span>
         </div>
         <h3>${esc(f.title || "Untitled form")}</h3>
-        <div class="meta"><span class="resp-count">${count}</span> response${count === 1 ? "" : "s"}</div>
+        ${isIndividual && f.recipient_name ? `<div class="meta">For ${esc(f.recipient_name)}</div>` : ""}
+        <div class="meta"><span class="resp-count">${count}</span> response${count === 1 ? "" : "s"}<span>· ${fmtDate(f.created_at)}</span></div>
       </div>`;
     })
     .join("");
@@ -292,7 +297,13 @@ async function renderBuilder(formId) {
     root.innerHTML = `<div class="container"><div class="empty-state"><h3>Form not found</h3><p><a href="#/">Back to your forms</a></p></div></div>`;
     return;
   }
-  builderState = { ...form, questions: form.questions?.length ? form.questions : [] };
+  builderState = {
+    ...form,
+    questions: form.questions?.length ? form.questions : [],
+    form_type: form.form_type || "general",
+    recipient_name: form.recipient_name || "",
+    recipient_email: form.recipient_email || "",
+  };
 
   root.innerHTML = `
     <div class="builder-bar">
@@ -306,6 +317,18 @@ async function renderBuilder(formId) {
     </div>
     <div class="builder-layout">
       <div class="builder-pane editor">
+        <div class="type-toggle-block">
+          <span class="type-toggle-label">Who is this for?</span>
+          <div class="type-toggle" role="group">
+            <button type="button" class="type-toggle-btn ${builderState.form_type === "general" ? "active" : ""}" data-type="general">General<span>Anyone with the link</span></button>
+            <button type="button" class="type-toggle-btn ${builderState.form_type === "individual" ? "active" : ""}" data-type="individual">Individual<span>One recipient, one reply</span></button>
+          </div>
+          <div id="recipient-fields" style="${builderState.form_type === "individual" ? "" : "display:none;"}">
+            <div class="field"><label for="r-name">Recipient name</label><input type="text" id="r-name" placeholder="e.g. Jamie Ruiz" value="${esc(builderState.recipient_name || "")}"/></div>
+            <div class="field"><label for="r-email">Recipient email (optional, just for your reference)</label><input type="email" id="r-email" placeholder="jamie@example.com" value="${esc(builderState.recipient_email || "")}"/></div>
+            <p class="type-note">Once this person submits, the link closes automatically — nobody else can use it.</p>
+          </div>
+        </div>
         <div class="field form-desc-field">
           <label for="b-desc">Description (optional)</label>
           <textarea id="b-desc" placeholder="Tell people what this form is for">${esc(builderState.description || "")}</textarea>
@@ -332,13 +355,29 @@ async function renderBuilder(formId) {
     queueSave();
     renderPreview();
   });
+  document.querySelectorAll(".type-toggle-btn").forEach((btn) => {
+    btn.onclick = () => {
+      builderState.form_type = btn.dataset.type;
+      document.querySelectorAll(".type-toggle-btn").forEach((b) => b.classList.toggle("active", b === btn));
+      document.getElementById("recipient-fields").style.display = btn.dataset.type === "individual" ? "" : "none";
+      queueSave();
+    };
+  });
+  document.getElementById("r-name").addEventListener("input", (e) => {
+    builderState.recipient_name = e.target.value;
+    queueSave();
+  });
+  document.getElementById("r-email").addEventListener("input", (e) => {
+    builderState.recipient_email = e.target.value;
+    queueSave();
+  });
   document.getElementById("b-responses").onclick = () => (location.hash = `#/responses/${formId}`);
-  document.getElementById("b-share").onclick = () => openShareModal(formId, builderState.is_published);
+  document.getElementById("b-share").onclick = () => openShareModal(formId, builderState.is_published, builderState.form_type);
   document.getElementById("b-publish").onclick = async () => {
     builderState.is_published = !builderState.is_published;
     await saveForm(true);
     renderBuilder(formId);
-    if (builderState.is_published) openShareModal(formId, true);
+    if (builderState.is_published) openShareModal(formId, true, builderState.form_type);
   };
   document.querySelectorAll("[data-add]").forEach((btn) => {
     btn.onclick = () => addQuestion(btn.dataset.add);
@@ -364,6 +403,9 @@ async function saveForm(immediate) {
       description: builderState.description,
       questions: builderState.questions,
       is_published: builderState.is_published,
+      form_type: builderState.form_type,
+      recipient_name: builderState.recipient_name,
+      recipient_email: builderState.recipient_email,
     })
     .eq("id", builderState.id);
   if (ind) ind.textContent = error ? "Couldn't save" : "Saved";
@@ -547,8 +589,9 @@ function renderPreviewQuestion(q) {
 }
 
 // ---------------------------------------------------------------- share modal
-function openShareModal(formId, isPublished) {
+function openShareModal(formId, isPublished, formType) {
   const url = `${location.origin}${location.pathname}#/form/${formId}`;
+  const isIndividual = formType === "individual";
   const backdrop = document.createElement("div");
   backdrop.className = "modal-backdrop";
   backdrop.innerHTML = `
@@ -556,7 +599,11 @@ function openShareModal(formId, isPublished) {
       <h3>${isPublished ? "Share your form" : "Publish first"}</h3>
       ${
         isPublished
-          ? `<p style="color:var(--ink-soft);margin-bottom:14px;">Anyone with this link can fill it in. No account needed.</p>
+          ? `<p style="color:var(--ink-soft);margin-bottom:14px;">${
+              isIndividual
+                ? "This link works once. As soon as your recipient submits it, it closes for everyone else."
+                : "Anyone with this link can fill it in. No account needed."
+            }</p>
              <div class="share-link-row"><input readonly value="${url}" id="share-url"/><button class="btn small" id="copy-link">Copy</button></div>`
           : `<p style="color:var(--ink-soft);">Publish the form first, then this link becomes shareable.</p>`
       }
@@ -582,12 +629,13 @@ async function renderFillPage(formId) {
   root.innerHTML = `<div class="loading-line">Loading form…</div>`;
   const { data: form, error } = await sb.from("forms").select("*").eq("id", formId).eq("is_published", true).single();
   if (error || !form) {
-    root.innerHTML = `<div class="fill-shell"><div class="unavailable"><h2>This form isn't available</h2><p>It may be unpublished or the link is incorrect.</p></div></div>`;
+    root.innerHTML = `<div class="fill-shell"><div class="unavailable"><h2>This form isn't available</h2><p>It may be unpublished, already completed, or the link is incorrect.</p></div></div>`;
     return;
   }
   root.innerHTML = `
     <div class="fill-shell">
       <div class="fill-card">
+        ${form.form_type === "individual" && form.recipient_name ? `<p class="recipient-tag">For ${esc(form.recipient_name)}</p>` : ""}
         <h1>${esc(form.title || "Untitled form")}</h1>
         ${form.description ? `<p class="fill-desc">${esc(form.description)}</p>` : ""}
         <form id="fill-form">
@@ -613,6 +661,11 @@ async function renderFillPage(formId) {
     submitBtn.textContent = "Submitting…";
     const { error: insErr } = await sb.from("responses").insert({ form_id: form.id, answers });
     if (insErr) {
+      const alreadyClosed = /already received its response/i.test(insErr.message);
+      if (alreadyClosed) {
+        root.innerHTML = `<div class="fill-shell"><div class="unavailable"><h2>This form has already been completed</h2><p>It was meant for one reply, and that reply has already come in.</p></div></div>`;
+        return;
+      }
       toast("Couldn't submit", insErr.message);
       submitBtn.disabled = false;
       submitBtn.textContent = "Submit";
