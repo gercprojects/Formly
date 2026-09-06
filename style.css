@@ -249,6 +249,10 @@ main.view { flex: 1; width: 100%; }
 .status-pill { font-size: 0.72rem; font-weight: 600; padding: 3px 10px; border-radius: 999px; }
 .status-pill.live { background: #EAF2EF; color: #2f5347; border: 1px solid var(--sage); }
 .status-pill.draft { background: var(--paper-dim); color: var(--ink-soft); border: 1px solid var(--line); }
+.status-pill.done { background: #FDF1E4; color: #9A5B12; border: 1px solid var(--zap-deep); }
+.type-pill { font-size: 0.72rem; font-weight: 600; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--ink); }
+.type-pill.individual { background: var(--ink); color: var(--paper); }
+.type-pill.general { background: transparent; color: var(--ink); }
 .form-card .resp-count { font-weight: 600; }
 .new-form-card {
   border: 2px dashed var(--line);
@@ -312,6 +316,39 @@ main.view { flex: 1; width: 100%; }
 .builder-pane.preview { background: var(--paper-dim); }
 
 .form-desc-field textarea { min-height: 60px; resize: vertical; }
+
+.type-toggle-block { margin-bottom: 26px; }
+.type-toggle-label { display: block; font-size: 0.85rem; font-weight: 600; margin-bottom: 8px; color: var(--ink-soft); }
+.type-toggle { display: flex; gap: 10px; margin-bottom: 4px; }
+.type-toggle-btn {
+  flex: 1;
+  text-align: left;
+  padding: 12px 16px;
+  border: 2px solid var(--line);
+  border-radius: 14px;
+  background: var(--white);
+  cursor: pointer;
+  font-family: var(--body);
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--ink-soft);
+}
+.type-toggle-btn span { display: block; font-weight: 400; font-size: 0.8rem; margin-top: 2px; color: var(--ink-soft); }
+.type-toggle-btn.active { border-color: var(--ink); background: var(--zap); color: var(--ink); }
+.type-toggle-btn.active span { color: var(--ink-soft); }
+.type-note { font-size: 0.82rem; color: var(--ink-soft); margin: 4px 0 0; }
+#recipient-fields { margin-top: 16px; padding: 16px; background: var(--paper-dim); border-radius: 14px; }
+
+.recipient-tag {
+  display: inline-block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  border: 1px solid var(--line);
+  padding: 4px 12px;
+  border-radius: 999px;
+  margin-bottom: 14px;
+}
 
 .question-card {
   background: var(--white);
