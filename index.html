@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Formly — forms without the fuss</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2222%22 fill=%22%23191825%22/><circle cx=%2250%22 cy=%2245%22 r=%2213%22 fill=%22%23F4C94B%22/></svg>"/>
+<link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+  <div id="app">
+    <header class="topbar">
+      <div class="brand" onclick="location.hash='#/'">Formly<span class="dot">.</span></div>
+      <div class="topbar-actions" id="topbar-actions"></div>
+    </header>
+    <main class="view" id="app-root"></main>
+  </div>
+  <div id="toast-root"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
